@@ -1,5 +1,10 @@
 #!/usr/bin/env Rscript
 
+# install missing required packages
+required <- c("data.table", "stringr")
+missed <- setdiff(required, rownames(installed.packages()))
+if (length(missed)) install.packages(missed)
+
 args <- commandArgs(trailingOnly=TRUE)
 
 if (!length(args)) {
