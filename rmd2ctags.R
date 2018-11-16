@@ -23,7 +23,7 @@ read_lines <- function (filename) {
 regexs <- function () {
     list(
         header = "^(#+)([^{]+)(\\{[^}]+\\})?$",
-        chunk_start = "^```\\{r ([^,]+)(,[^}]*)?\\}$",
+        chunk_start = "^```\\{r(\\s*)([^,]+)?(,[^}]*)?\\}$",
         chunk_end = "^```\\s*$",
         yaml = "^---()\\s*$",
         yaml_opt = "^([^#].*):.*$",
@@ -62,18 +62,19 @@ sep_lines_yaml <- function (l) {
 
 # sep_lines_chunk {{{
 sep_lines_chunk <- function (l) {
-    l$left <- sep_by_regex(l$left, regexs()$chunk_start, c("chunk", "opt"), trim = TRUE)
+    l$left <- sep_by_regex(l$left, regexs()$chunk_start, c("is_chunk", "chunk", "opt"), trim = TRUE)
 
-    l$left[!is.na(chunk), index_chunk := .I]
-    l$left[, `:=`(index_chunk = index_chunk[1L]), by = cumsum(!is.na(chunk))]
+    l$left[!is.na(is_chunk), index_chunk := .I]
+    l$left[, `:=`(index_chunk = index_chunk[1L]), by = cumsum(!is.na(is_chunk))]
 
-    s <- l$left[!is.na(chunk), .(start = line, index_chunk)]
+    s <- l$left[!is.na(is_chunk), .(start = line, index_chunk)]
     e <- l$left[stringr::str_detect(string, regexs()$chunk_end), .(end = line, index_chunk)]
     if (!nrow(s)) {
-        data.table::set(l$left, NULL, c("chunk", "opt", "index_chunk"), NULL)
+        data.table::set(l$left, NULL, c("is_chunk", "chunk", "opt", "index_chunk"), NULL)
         return(l)
     }
 
+    # ignore incomplete
     se <- merge(s, e, by = "index_chunk", all = TRUE)
     se <- na.omit(se)
 
@@ -81,7 +82,12 @@ sep_lines_chunk <- function (l) {
     data.table::setnames(chunks, "start", "line")
     data.table::set(chunks, NULL, "end", NULL)
 
-    l$left <- l$left[!chunks, on = .(line)][, c("chunk", "opt", "index_chunk") := NULL]
+    # name unnamed
+    chunks[, index := .I]
+    chunks[index %in% chunks[, index[1L], by = .(index_chunk)]$V1 & is.na(chunk),
+        chunk := paste0("unnamed-chunk-", .I)]
+
+    l$left <- l$left[!chunks, on = .(line)][, c("is_chunk", "chunk", "opt", "index_chunk") := NULL]
     return(c(l, list(chunks = chunks[, .(string, line, chunk, opt, index_chunk)])))
 }
 # }}}
