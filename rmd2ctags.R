@@ -226,14 +226,14 @@ create_tags_chunk <- function (l) {
     nms <- names(chunks)
 
     hc <- data.table::rbindlist(list(
-        l$headers[, .(line, parent, depth)],
+        l$headers[, .(line, parent, depth, header)],
         chunks
     ), fill = TRUE)
 
     data.table::setorderv(hc, "line")
 
-    hc[, parent := parent[1L], by = .(cumsum(!is.na(depth)))]
-    chunks <- hc[is.na(depth)][!is.na(parent), out := paste0(out, "\theader:", parent)][, ..nms]
+    hc[, `:=`(parent = parent[1L], header = header[1L]), by = .(cumsum(!is.na(depth)))]
+    chunks <- hc[is.na(depth)][!is.na(parent), out := paste0(out, "\theader:", parent, "&&&", header)][, ..nms]
 
     append_tag(chunks, "opt")
 
